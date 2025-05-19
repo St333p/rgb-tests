@@ -1,7 +1,7 @@
 use super::*;
 
 pub struct TestWallet {
-    wallet: RgbWallet<Wallet<XpubDerivable, RgbDescr>>,
+    pub wallet: RgbWallet<Wallet<XpubDerivable, RgbDescr>>,
     signer: Option<TestnetSigner>,
     wallet_dir: PathBuf,
     instance: u8,
@@ -202,14 +202,14 @@ impl AssetSchema {
         kit.validate().unwrap()
     }
 
-    fn default_state_type(&self) -> StateType {
+    pub fn default_state_type(&self) -> StateType {
         match self {
             Self::Cfa | Self::Nia | Self::Pfa | Self::Ifa => StateType::Fungible,
             Self::Uda => StateType::Structured,
         }
     }
 
-    fn allocated_state(&self, value: u64) -> AllocatedState {
+    pub fn allocated_state(&self, value: u64) -> AllocatedState {
         match self {
             Self::Cfa | Self::Nia | Self::Pfa | Self::Ifa => AllocatedState::Amount(value.into()),
             Self::Uda => AllocatedState::Data(
