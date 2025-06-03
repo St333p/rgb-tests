@@ -2302,12 +2302,7 @@ fn no_double_spend() {
     wlt_1.accept_transfer(consignment, None);
     wlt_1.sync();
 
-    let btc_change = wlt_1.get_address();
-    let (mut psbt, _) = wlt_1.construct_psbt(vec![utxo], vec![(btc_change, None)], None);
-    psbt.construct_output_expect(ScriptPubkey::op_return(&[]), Sats::ZERO);
-    psbt.output_mut(1).unwrap().set_opret_host().unwrap();
-    psbt.set_rgb_close_method(CloseMethod::OpretFirst);
-
+    // retrieve the two opouts on utxo
     let allocations = wlt_1
         .wallet
         .stock()
@@ -2319,6 +2314,13 @@ fn no_double_spend() {
     assert_eq!(allocations.len(), 2);
     let (opout_1, _) = allocations[0];
     let (opout_2, _) = allocations[1];
+
+    // construct transaction committing to bundle with missing transition
+    let btc_change = wlt_1.get_address();
+    let (mut psbt, _) = wlt_1.construct_psbt(vec![utxo], vec![(btc_change, None)], None);
+    psbt.construct_output_expect(ScriptPubkey::op_return(&[]), Sats::ZERO);
+    psbt.output_mut(1).unwrap().set_opret_host().unwrap();
+    psbt.set_rgb_close_method(CloseMethod::OpretFirst);
 
     // 1st transition
     let mut transition_builder = wlt_1
@@ -2370,7 +2372,6 @@ fn no_double_spend() {
     let fascia = psbt.rgb_commit().unwrap();
     let witness_id = psbt.txid();
     wlt_1.consume_fascia(fascia, witness_id);
-
     let tx = wlt_1.sign_finalize_extract(&mut psbt);
     wlt_1.broadcast_tx(&tx);
     wlt_2.sync();
@@ -2400,5 +2401,21 @@ fn no_double_spend() {
         .insert(bundle_id, NonEmptyOrdSet::with(secret_seal_1).into())
         .unwrap();
 
+    // ensure the consignment contains the bundle with missing transition
+    let bundle = consignment
+        .bundles
+        .iter()
+        .find(|wb| {
+            wb.bundle
+                .input_map
+                .values()
+                .flat_map(|m| m.iter())
+                .collect::<BTreeSet<_>>()
+                .contains(&opid_2)
+        })
+        .unwrap();
+    assert!(!bundle.bundle.known_transitions.contains_key(&opid_2));
+
+    // validation fails with BundleExtraTransition
     wlt_2.accept_transfer(consignment, None);
 }
